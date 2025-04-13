@@ -7,6 +7,7 @@ import { SessionProvider } from "next-auth/react";
 function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchUser();
@@ -16,11 +17,9 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   const fetchUser = async () => {
     setIsLoading(true);
     try {
-      // Build the URL properly - use relative path if BACKEND_HOSTNAME is empty
-      const url = BACKEND_HOSTNAME
-        ? `${BACKEND_HOSTNAME}/api/auth/protected`
-        : "/api/auth/protected";
-
+      // Always use relative URLs in browser to avoid CORS issues
+      const url = '/api/auth/protected';
+      
       const response = await axios.get(url, {
         withCredentials: true,
       });
@@ -28,7 +27,11 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
       setUser(response.data.user);
       console.log("Authentication successful:", response.data.user);
     } catch (error) {
-      console.error("Authentication error:", error.message);
+      console.error("Authentication error:", error.message || error);
+      // Don't treat 404 as a critical error - user might not be logged in
+      if (error.response && error.response.status !== 404) {
+        setError(`Authentication failed: ${error.message}`);
+      }
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -42,6 +45,7 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
         user={user}
         setUser={setUser}
         isLoading={isLoading}
+        authError={error}
       />
     </SessionProvider>
   );
