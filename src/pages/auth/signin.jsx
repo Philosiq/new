@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { signIn, getCsrfToken } from "next-auth/react";
+import React, { useState, useEffect } from "react";
+import { signIn, getCsrfToken, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Layout from "../../components/Layout";
 
@@ -10,9 +10,18 @@ export default function SignIn({ csrfToken }) {
   const [isLoading, setIsLoading] = useState(false);
   const [detailedError, setDetailedError] = useState(null);
   const router = useRouter();
+  const { data: session, status } = useSession();
+
+  // If already authenticated, redirect to admin
+  useEffect(() => {
+    if (status === "authenticated") {
+      console.log("User already authenticated, redirecting to admin");
+      router.replace(router.query.callbackUrl || "/admin");
+    }
+  }, [status, router]);
 
   // Check for error from URL (e.g., when redirected from protected page)
-  React.useEffect(() => {
+  useEffect(() => {
     if (router.query.error) {
       setError("You must be signed in to access this page");
     }
@@ -33,6 +42,7 @@ export default function SignIn({ csrfToken }) {
     try {
       // For deployment debugging, log the current hostname
       console.log("Current hostname:", window.location.origin);
+      console.log("Login attempt with email:", email);
 
       // Attempt to sign in with credentials
       const result = await signIn("credentials", {
@@ -85,10 +95,15 @@ export default function SignIn({ csrfToken }) {
           }
         }
       } else {
-        // Redirect to admin dashboard or callback URL
-        const callbackUrl = router.query.callbackUrl || "/admin";
-        console.log("Redirecting to:", callbackUrl);
-        router.push(callbackUrl);
+        // Login successful
+        console.log("Login successful, redirecting to:", result.url);
+
+        // Force refresh the session
+        await fetch("/api/auth/session");
+
+        // Hard refresh to admin page to ensure cookies are properly set
+        window.location.href =
+          result.url || router.query.callbackUrl || "/admin";
       }
     } catch (error) {
       console.error("Sign in error:", error);
@@ -114,6 +129,36 @@ export default function SignIn({ csrfToken }) {
       console.error("Failed to get debug info:", error);
     }
   };
+
+  // If session loading, show loading state
+  if (status === "loading") {
+    return (
+      <Layout title="Loading... - PhilosiQ Admin">
+        <div className="pt-24 pb-16 min-h-screen bg-neutral-light flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-primary-maroon border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading session...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // If already authenticated, don't render the form
+  if (status === "authenticated") {
+    return (
+      <Layout title="Redirecting... - PhilosiQ Admin">
+        <div className="pt-24 pb-16 min-h-screen bg-neutral-light flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-primary-maroon border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="mt-4 text-gray-600">
+              Already logged in. Redirecting...
+            </p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout title="Sign In - PhilosiQ Admin">

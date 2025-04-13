@@ -64,17 +64,23 @@ export const authOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // Add role to JWT token if user is present
+      // Add user details to JWT token if user is present
       if (user) {
         token.role = user.role;
         token.id = user.id;
+        token.name = user.name;
+        token.email = user.email;
       }
       return token;
     },
     async session({ session, token }) {
-      // Add role to session object
-      session.user.role = token.role;
-      session.user.id = token.id;
+      // Add user details to session object
+      if (token) {
+        session.user.role = token.role;
+        session.user.id = token.id;
+        session.user.name = token.name;
+        session.user.email = token.email;
+      }
       return session;
     },
   },
@@ -96,6 +102,7 @@ export const authOptions = {
         sameSite: "lax",
         path: "/",
         secure: process.env.NODE_ENV === "production", // Enable in production
+        domain: process.env.NODE_ENV === "production" ? undefined : "localhost", // Allow domain to be auto-detected in production
       },
     },
   },
