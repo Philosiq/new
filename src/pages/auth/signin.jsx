@@ -8,7 +8,15 @@ export default function SignIn({ csrfToken }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [detailedError, setDetailedError] = useState(null);
   const router = useRouter();
+
+  // Check for error from URL (e.g., when redirected from protected page)
+  React.useEffect(() => {
+    if (router.query.error) {
+      setError("You must be signed in to access this page");
+    }
+  }, [router.query]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,6 +28,7 @@ export default function SignIn({ csrfToken }) {
 
     setIsLoading(true);
     setError(null);
+    setDetailedError(null);
 
     try {
       const result = await signIn("credentials", {
@@ -29,17 +38,43 @@ export default function SignIn({ csrfToken }) {
       });
 
       if (result.error) {
+        console.error("Sign in error:", result.error);
         setError(result.error);
+
+        // Check for connection issues
+        if (
+          result.error.includes("network") ||
+          result.error.includes("fetch")
+        ) {
+          setDetailedError(
+            "There seems to be a network issue. Please check your internet connection."
+          );
+        }
       } else {
         // Redirect to admin dashboard or callback URL
         const callbackUrl = router.query.callbackUrl || "/admin";
         router.push(callbackUrl);
       }
     } catch (error) {
-      setError("An error occurred during sign in");
       console.error("Sign in error:", error);
+      setError("An error occurred during sign in");
+      setDetailedError(`Technical details: ${error.message}`);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Function to get auth debug info (development only)
+  const checkAuthDebug = async () => {
+    if (process.env.NODE_ENV !== "development") return;
+
+    try {
+      const response = await fetch("/api/auth/debug");
+      const data = await response.json();
+      console.log("Auth debug info:", data);
+      setDetailedError(JSON.stringify(data, null, 2));
+    } catch (error) {
+      console.error("Failed to get debug info:", error);
     }
   };
 
@@ -63,6 +98,16 @@ export default function SignIn({ csrfToken }) {
                 role="alert"
               >
                 <p>{error}</p>
+                {detailedError && (
+                  <details className="mt-2 text-sm">
+                    <summary className="cursor-pointer">
+                      Technical Details
+                    </summary>
+                    <pre className="mt-2 whitespace-pre-wrap">
+                      {detailedError}
+                    </pre>
+                  </details>
+                )}
               </div>
             )}
 
@@ -115,6 +160,18 @@ export default function SignIn({ csrfToken }) {
               >
                 {isLoading ? "Signing in..." : "Sign In"}
               </button>
+
+              {process.env.NODE_ENV === "development" && (
+                <div className="mt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={checkAuthDebug}
+                    className="text-sm text-gray-500 hover:text-primary-maroon"
+                  >
+                    Check Auth Status (Dev Only)
+                  </button>
+                </div>
+              )}
             </form>
           </div>
         </div>

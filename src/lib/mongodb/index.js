@@ -21,23 +21,44 @@ async function connectToDatabase() {
     const opts = {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      // Add connection timeouts for more reliability
+      serverSelectionTimeoutMS: 10000, // Timeout after 10s instead of 30s
+      socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      console.log("Connected to MongoDB");
-      return mongoose;
-    });
+    console.log(
+      `Connecting to MongoDB at ${MONGODB_URI.split("@")[1].split("/")[0]}`
+    ); // Log connection target without credentials
+
+    cached.promise = mongoose
+      .connect(MONGODB_URI, opts)
+      .then((mongoose) => {
+        console.log("Connected to MongoDB successfully");
+        return mongoose;
+      })
+      .catch((err) => {
+        console.error("MongoDB connection error details:", {
+          name: err.name,
+          message: err.message,
+          code: err.code,
+          codeName: err.codeName,
+        });
+        throw err;
+      });
   }
 
   try {
     cached.conn = await cached.promise;
-    console.log("MongoDB connection established successfully");
+
     // Log available collections
     const collections = Object.keys(mongoose.connection.collections);
     console.log("Available collections:", collections);
+
     return cached.conn;
   } catch (error) {
     console.error("MongoDB connection error:", error);
+    // Reset the promise if connection fails, so we can try again
+    cached.promise = null;
     throw error;
   }
 }

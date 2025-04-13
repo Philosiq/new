@@ -13,29 +13,34 @@ export const authOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        await connectToDatabase();
+        try {
+          await connectToDatabase();
 
-        // Find user by email
-        const user = await User.findOne({ email: credentials.email }).select(
-          "+password"
-        );
+          // Find user by email
+          const user = await User.findOne({ email: credentials.email }).select(
+            "+password"
+          );
 
-        // Check if user exists and password is correct
-        if (
-          !user ||
-          !(await bcrypt.compare(credentials.password, user.password))
-        ) {
-          throw new Error("Invalid email or password");
+          // Check if user exists and password is correct
+          if (
+            !user ||
+            !(await bcrypt.compare(credentials.password, user.password))
+          ) {
+            throw new Error("Invalid email or password");
+          }
+
+          // Return user object without password
+          return {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            image: user.image,
+          };
+        } catch (error) {
+          console.error("Authentication error:", error);
+          throw new Error(error.message || "Authentication failed");
         }
-
-        // Return user object without password
-        return {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          image: user.image,
-        };
       },
     }),
   ],
@@ -65,6 +70,17 @@ export const authOptions = {
   },
   secret:
     process.env.NEXTAUTH_SECRET || "default-secret-key-change-in-production",
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production", // Enable in production
+      },
+    },
+  },
   debug: process.env.NODE_ENV === "development",
 };
 
