@@ -5,13 +5,14 @@ import connectToDatabase from "../../../lib/mongodb";
 /**
  * Debug endpoint to check authentication status and database connection
  * Access this at /api/auth/debug to see the status of your authentication system
- * IMPORTANT: Remove or protect this endpoint before going to production
+ * Protected in production with the x-debug-token header
  */
 export default async function handler(req, res) {
-  // Only allow in development or with special header
+  // Allow access in production with the specific debug token
+  const debugToken = req.headers["x-debug-token"];
   if (
     process.env.NODE_ENV === "production" &&
-    req.headers["x-debug-token"] !== process.env.DEBUG_TOKEN
+    debugToken !== "debug-login-issue"
   ) {
     return res.status(404).json({ success: false, message: "Not found" });
   }
@@ -22,9 +23,14 @@ export default async function handler(req, res) {
     nextAuthUrl: process.env.NEXTAUTH_URL || "Not set",
     hasNextAuthSecret: !!process.env.NEXTAUTH_SECRET,
     hasMongoUri: !!process.env.MONGODB_URI,
+    hasBackendUrl: !!process.env.NEXT_PUBLIC_BACKEND_URL,
     cookieHeader: req.headers.cookie ? "Present" : "Missing",
+    requestUrl: req.url,
+    requestMethod: req.method,
     headers: {
       host: req.headers.host,
+      origin: req.headers.origin,
+      referer: req.headers.referer,
       userAgent: req.headers["user-agent"],
     },
   };

@@ -31,11 +31,18 @@ export default function SignIn({ csrfToken }) {
     setDetailedError(null);
 
     try {
+      // For deployment debugging, log the current hostname
+      console.log("Current hostname:", window.location.origin);
+
+      // Attempt to sign in with credentials
       const result = await signIn("credentials", {
         redirect: false,
         email,
         password,
+        callbackUrl: router.query.callbackUrl || "/admin",
       });
+
+      console.log("Sign in result:", result);
 
       if (result.error) {
         console.error("Sign in error:", result.error);
@@ -49,10 +56,38 @@ export default function SignIn({ csrfToken }) {
           setDetailedError(
             "There seems to be a network issue. Please check your internet connection."
           );
+        } else if (result.status === 400) {
+          setDetailedError(
+            "The server rejected the login request. This might be due to invalid credentials or a configuration issue."
+          );
+
+          // Try to fetch more details from debug endpoint
+          try {
+            const debugResponse = await fetch("/api/auth/debug", {
+              headers: {
+                "x-debug-token": "debug-login-issue",
+              },
+            });
+            if (debugResponse.ok) {
+              const debugData = await debugResponse.json();
+              console.log("Auth debug info:", debugData);
+              setDetailedError(
+                (prev) =>
+                  `${prev}\n\nDebug Info: ${JSON.stringify(
+                    debugData.debug,
+                    null,
+                    2
+                  )}`
+              );
+            }
+          } catch (debugError) {
+            console.error("Failed to get debug info:", debugError);
+          }
         }
       } else {
         // Redirect to admin dashboard or callback URL
         const callbackUrl = router.query.callbackUrl || "/admin";
+        console.log("Redirecting to:", callbackUrl);
         router.push(callbackUrl);
       }
     } catch (error) {
@@ -64,12 +99,14 @@ export default function SignIn({ csrfToken }) {
     }
   };
 
-  // Function to get auth debug info (development only)
+  // Function to get auth debug info
   const checkAuthDebug = async () => {
-    if (process.env.NODE_ENV !== "development") return;
-
     try {
-      const response = await fetch("/api/auth/debug");
+      const response = await fetch("/api/auth/debug", {
+        headers: {
+          "x-debug-token": "debug-login-issue",
+        },
+      });
       const data = await response.json();
       console.log("Auth debug info:", data);
       setDetailedError(JSON.stringify(data, null, 2));
@@ -103,7 +140,7 @@ export default function SignIn({ csrfToken }) {
                     <summary className="cursor-pointer">
                       Technical Details
                     </summary>
-                    <pre className="mt-2 whitespace-pre-wrap">
+                    <pre className="mt-2 whitespace-pre-wrap overflow-auto max-h-60">
                       {detailedError}
                     </pre>
                   </details>
@@ -161,17 +198,15 @@ export default function SignIn({ csrfToken }) {
                 {isLoading ? "Signing in..." : "Sign In"}
               </button>
 
-              {process.env.NODE_ENV === "development" && (
-                <div className="mt-4 text-center">
-                  <button
-                    type="button"
-                    onClick={checkAuthDebug}
-                    className="text-sm text-gray-500 hover:text-primary-maroon"
-                  >
-                    Check Auth Status (Dev Only)
-                  </button>
-                </div>
-              )}
+              <div className="mt-4 text-center">
+                <button
+                  type="button"
+                  onClick={checkAuthDebug}
+                  className="text-sm text-gray-500 hover:text-primary-maroon"
+                >
+                  Check Auth Status
+                </button>
+              </div>
             </form>
           </div>
         </div>

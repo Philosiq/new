@@ -4,6 +4,14 @@ import bcrypt from "bcryptjs";
 import connectToDatabase from "../../../lib/mongodb";
 import User from "../../../models/User";
 
+// Log environment info (only in development)
+if (process.env.NODE_ENV === "development") {
+  console.log("NextAuth Configuration:");
+  console.log("- NEXTAUTH_URL:", process.env.NEXTAUTH_URL || "Not set");
+  console.log("- NODE_ENV:", process.env.NODE_ENV);
+  console.log("- Has NEXTAUTH_SECRET:", !!process.env.NEXTAUTH_SECRET);
+}
+
 export const authOptions = {
   providers: [
     CredentialsProvider({
@@ -14,6 +22,10 @@ export const authOptions = {
       },
       async authorize(credentials) {
         try {
+          if (!credentials) {
+            throw new Error("No credentials provided");
+          }
+
           await connectToDatabase();
 
           // Find user by email
@@ -22,16 +34,22 @@ export const authOptions = {
           );
 
           // Check if user exists and password is correct
-          if (
-            !user ||
-            !(await bcrypt.compare(credentials.password, user.password))
-          ) {
-            throw new Error("Invalid email or password");
+          if (!user) {
+            throw new Error("No user found with this email address");
+          }
+
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.password
+          );
+
+          if (!isPasswordValid) {
+            throw new Error("Invalid password");
           }
 
           // Return user object without password
           return {
-            id: user._id,
+            id: user._id.toString(),
             name: user.name,
             email: user.email,
             role: user.role,
@@ -81,7 +99,7 @@ export const authOptions = {
       },
     },
   },
-  debug: process.env.NODE_ENV === "development",
+  debug: true, // Enable debug to see what's happening
 };
 
 export default NextAuth(authOptions);
