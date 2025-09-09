@@ -5,6 +5,7 @@ import axios from "axios";
 import { SessionProvider } from "next-auth/react";
 import { useRouter } from "next/router";
 import { Analytics } from "@vercel/analytics/react";
+import Script from "next/script";
 
 function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   const [user, setUser] = useState(null);
@@ -58,6 +59,13 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
 
   return (
     <SessionProvider session={session}>
+      {/* Google AdSense Script */}
+      <Script
+        id="adsbygoogle-init"
+        strategy="afterInteractive"
+        crossOrigin="anonymous"
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9441277012043156"
+      />
       <Component {...pageProps} user={user} setUser={setUser} />
       <Analytics />
     </SessionProvider>
